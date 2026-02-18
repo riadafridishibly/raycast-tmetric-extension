@@ -1,4 +1,4 @@
-import { Action, ActionPanel, Form, List, showToast, Toast, popToRoot, Icon, useNavigation } from "@raycast/api";
+import { Action, ActionPanel, List, showToast, Toast, popToRoot, Icon, useNavigation } from "@raycast/api";
 import { useCachedPromise } from "@raycast/utils";
 import { useRef, useState } from "react";
 import { TimerService } from "./services/timer-service";
@@ -33,8 +33,8 @@ export default function StartTimer() {
     (s) => s.description.toLowerCase() === searchText.trim().toLowerCase(),
   );
 
-  function pushForm(prefill?: { description?: string; projectId?: number }) {
-    push(<StartTimerForm service={service} prefill={prefill} />);
+  function pickProject(description?: string, suggestedProjectId?: number) {
+    push(<ProjectPicker service={service} description={description} suggestedProjectId={suggestedProjectId} />);
   }
 
   return (
@@ -51,7 +51,7 @@ export default function StartTimer() {
           icon={Icon.Pencil}
           actions={
             <ActionPanel>
-              <Action title="Use This Description" onAction={() => pushForm({ description: searchText.trim() })} />
+              <Action title="Use This Description" onAction={() => pickProject(searchText.trim())} />
             </ActionPanel>
           }
         />
@@ -63,7 +63,7 @@ export default function StartTimer() {
           icon={Icon.Clock}
           actions={
             <ActionPanel>
-              <Action title="Start Without Description" onAction={() => pushForm()} />
+              <Action title="Start Without Description" onAction={() => pickProject()} />
             </ActionPanel>
           }
         />
@@ -80,12 +80,7 @@ export default function StartTimer() {
             <ActionPanel>
               <Action
                 title="Use This Description"
-                onAction={() =>
-                  pushForm({
-                    description: s.description,
-                    projectId: s.lastProject?.id,
-                  })
-                }
+                onAction={() => pickProject(s.description, s.lastProject?.id)}
               />
             </ActionPanel>
           }
@@ -95,25 +90,26 @@ export default function StartTimer() {
   );
 }
 
-function StartTimerForm({
+function ProjectPicker({
   service,
-  prefill,
+  description,
+  suggestedProjectId,
 }: {
   service: TimerService;
-  prefill?: { description?: string; projectId?: number };
+  description?: string;
+  suggestedProjectId?: number;
 }) {
+  const [searchText, setSearchText] = useState("");
+
   const { data: projects, isLoading } = useCachedPromise(
     () => service.getProjects(),
     [],
   );
 
-  async function handleSubmit(values: { description: string; projectId: string }) {
+  async function startTimer(projectId?: number) {
     try {
       await ensureTMetricAppRunning();
-      await service.startTimer({
-        description: values.description,
-        projectId: values.projectId ? Number(values.projectId) : undefined,
-      });
+      await service.startTimer({ description, projectId });
       await showToast({ style: Toast.Style.Success, title: "Timer started" });
       await popToRoot();
     } catch (error) {
@@ -122,34 +118,53 @@ function StartTimerForm({
     }
   }
 
-  return (
-    <Form
-      isLoading={isLoading}
-      actions={
-        <ActionPanel>
-          <Action.SubmitForm title="Start Timer" onSubmit={handleSubmit} />
-        </ActionPanel>
-      }
-    >
-      <Form.TextField
-        id="description"
-        title="Description"
-        placeholder="What are you working on?"
-        defaultValue={prefill?.description ?? ""}
-        autoFocus
+  const allProjects = projects ?? [];
+  const suggested = suggestedProjectId != null ? allProjects.find((p) => p.id === suggestedProjectId) : undefined;
+  const rest = suggested ? allProjects.filter((p) => p.id !== suggested.id) : allProjects;
+  const query = searchText.toLowerCase();
+  const filteredRest = query ? rest.filter((p) => p.name.toLowerCase().includes(query)) : rest;
+  const showSuggested = suggested && (!query || suggested.name.toLowerCase().includes(query));
+
+  function projectItem(project: { id: number; name: string }) {
+    return (
+      <List.Item
+        key={project.id}
+        title={project.name}
+        icon={Icon.Folder}
+        actions={
+          <ActionPanel>
+            <Action title="Start Timer" onAction={() => startTimer(project.id)} />
+          </ActionPanel>
+        }
       />
-      <Form.Separator />
-      <Form.Dropdown
-        id="projectId"
-        title="Project"
-        defaultValue={prefill?.projectId != null ? String(prefill.projectId) : undefined}
-        storeValue={prefill?.projectId == null}
-      >
-        <Form.Dropdown.Item value="" title="No Project" icon={Icon.Circle} />
-        {(projects ?? []).map((project) => (
-          <Form.Dropdown.Item key={project.id} value={String(project.id)} title={project.name} icon={Icon.Folder} />
-        ))}
-      </Form.Dropdown>
-    </Form>
+    );
+  }
+
+  return (
+    <List
+      isLoading={isLoading}
+      searchBarPlaceholder="Search projects..."
+      filtering={false}
+      onSearchTextChange={setSearchText}
+    >
+      {showSuggested && (
+        <List.Section title="Suggested">
+          {projectItem(suggested)}
+        </List.Section>
+      )}
+      <List.Section title={showSuggested ? "All Projects" : undefined}>
+        <List.Item
+          key="__no_project__"
+          title="No Project"
+          icon={Icon.Circle}
+          actions={
+            <ActionPanel>
+              <Action title="Start Timer" onAction={() => startTimer()} />
+            </ActionPanel>
+          }
+        />
+        {filteredRest.map((p) => projectItem(p))}
+      </List.Section>
+    </List>
   );
 }
