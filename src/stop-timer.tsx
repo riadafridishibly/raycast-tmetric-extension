@@ -1,12 +1,11 @@
-import { showHUD, showToast, Toast } from "@raycast/api";
+import { showHUD } from "@raycast/api";
 import { TimerService } from "./services/timer-service";
 import { createApiClient } from "./api/api-factory";
 import { getPreferences } from "./lib/preferences";
 
 export default async function StopTimer() {
   const { apiToken, useMockApi } = getPreferences();
-  const api = createApiClient(apiToken, useMockApi);
-  const service = new TimerService(api);
+  const service = new TimerService(createApiClient(apiToken, useMockApi));
 
   try {
     const status = await service.getStatus();
@@ -20,6 +19,6 @@ export default async function StopTimer() {
     const desc = status.description ? `: ${status.description}` : "";
     await showHUD(`Timer stopped${desc}`);
   } catch (error) {
-    await showToast({ style: Toast.Style.Failure, title: "Failed to stop timer", message: String(error) });
+    await showHUD(`Failed to stop timer: ${String(error)}`);
   }
 }

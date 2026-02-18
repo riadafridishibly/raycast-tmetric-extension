@@ -13,12 +13,20 @@ interface ApiCall {
   args: unknown[];
 }
 
+function deepCopyScope(s: TMetricAccountScope): TMetricAccountScope {
+  return {
+    projects: s.projects.map((p) => ({ ...p })),
+    tags: s.tags.map((t) => ({ ...t })),
+    clients: s.clients.map((c) => ({ ...c })),
+  };
+}
+
 export class TMetricApiMock implements ITMetricApi {
   calls: ApiCall[] = [];
   currentTimer: TMetricTimer = { isStarted: false };
   user: TMetricUser = { ...mockUser };
-  scope: TMetricAccountScope = { ...mockAccountScope };
-  recentEntries: TMetricTimeEntry[] = [...mockRecentEntries];
+  scope: TMetricAccountScope = deepCopyScope(mockAccountScope);
+  recentEntries: TMetricTimeEntry[] = mockRecentEntries.map((e) => ({ ...e, details: { ...e.details } }));
 
   private record(method: string, ...args: unknown[]): void {
     this.calls.push({ method, args });
@@ -69,7 +77,7 @@ export class TMetricApiMock implements ITMetricApi {
     this.calls = [];
     this.currentTimer = { isStarted: false };
     this.user = { ...mockUser };
-    this.scope = { ...mockAccountScope };
-    this.recentEntries = [...mockRecentEntries];
+    this.scope = deepCopyScope(mockAccountScope);
+    this.recentEntries = mockRecentEntries.map((e) => ({ ...e, details: { ...e.details } }));
   }
 }

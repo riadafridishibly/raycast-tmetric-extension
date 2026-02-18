@@ -30,28 +30,25 @@ export class TimerService {
 
   async getStatus(): Promise<TimerStatus> {
     const accountId = await this.getAccountId();
-    const timer = await this.api.getTimer(accountId);
+    const [timer, scope] = await Promise.all([
+      this.api.getTimer(accountId),
+      this.api.getAccountScope(accountId),
+    ]);
 
-    if (!timer.isStarted || !timer.startTime) {
+    if (!timer.isStarted) {
       return { isRunning: false };
     }
 
-    const startTime = timer.startTime;
-    const elapsedSeconds = Math.floor((Date.now() - new Date(startTime).getTime()) / 1000);
-
-    let projectName: string | undefined;
-    if (timer.details?.projectId) {
-      const scope = await this.api.getAccountScope(accountId);
-      const project = scope.projects.find((p) => p.projectId === timer.details?.projectId);
-      projectName = project?.projectName;
-    }
+    const project = timer.details?.projectId
+      ? scope.projects.find((p) => p.projectId === timer.details?.projectId)
+      : undefined;
 
     return {
       isRunning: true,
       description: timer.details?.description,
-      projectName,
-      startTime,
-      elapsedSeconds,
+      projectName: project?.projectName,
+      startTime: timer.startTime,
+      elapsedSeconds: Math.floor((Date.now() - new Date(timer.startTime).getTime()) / 1000),
     };
   }
 

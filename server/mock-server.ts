@@ -11,7 +11,7 @@ const user = {
   activeAccountId: 42,
 };
 
-let currentTimer: { isStarted: boolean; startTime?: string; details?: Record<string, unknown> } = {
+let currentTimer: { isStarted: true; startTime: string; details?: Record<string, unknown> } | { isStarted: false } = {
   isStarted: false,
 };
 
@@ -53,10 +53,11 @@ function json(res: http.ServerResponse, data: unknown, status = 200) {
 }
 
 function readBody(req: http.IncomingMessage): Promise<string> {
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     let body = "";
     req.on("data", (chunk: Buffer) => (body += chunk.toString()));
     req.on("end", () => resolve(body));
+    req.on("error", reject);
   });
 }
 
@@ -71,55 +72,68 @@ const server = http.createServer(async (req, res) => {
   const method = req.method ?? "GET";
   const url = req.url ?? "/";
 
-  // GET /api/v3/user
-  if (method === "GET" && url === "/api/v3/user") {
-    log(method, url, user.name);
-    return json(res, user);
-  }
-
-  // Account-scoped routes: /api/v3/accounts/:id/...
-  const accountMatch = url.match(/^\/api\/v3\/accounts\/(\d+)\/(.+)$/);
-  if (accountMatch) {
-    const route = accountMatch[2];
-
-    // GET /timer
-    if (method === "GET" && route === "timer") {
-      log(method, url, currentTimer.isStarted ? "running" : "stopped");
-      return json(res, currentTimer);
+  try {
+    // GET /api/v3/user
+    if (method === "GET" && url === "/api/v3/user") {
+      log(method, url, user.name);
+      return json(res, user);
     }
 
-    // PUT /timer (start or stop)
-    if (method === "PUT" && route === "timer") {
-      const body = JSON.parse(await readBody(req));
-      if (body.isStarted) {
-        currentTimer = {
-          isStarted: true,
-          startTime: new Date().toISOString(),
-          details: body.details ?? {},
-        };
-        log(method, url, `started: "${body.details?.description ?? "(no description)"}"`);
-      } else {
-        currentTimer = { isStarted: false };
-        log(method, url, "stopped");
+    // Account-scoped routes: /api/v3/accounts/:id/...
+    const accountMatch = url.match(/^\/api\/v3\/accounts\/(\d+)\/(.+)$/);
+    if (accountMatch) {
+      const route = accountMatch[2];
+
+      // GET /timer
+      if (method === "GET" && route === "timer") {
+        log(method, url, currentTimer.isStarted ? "running" : "stopped");
+        return json(res, currentTimer);
       }
-      return json(res, currentTimer);
+
+      // PUT /timer (start or stop)
+      if (method === "PUT" && route === "timer") {
+        let body: Record<string, unknown>;
+        try {
+          body = JSON.parse(await readBody(req));
+        } catch {
+          log(method, url, "400 bad JSON");
+          return json(res, { error: "Invalid JSON body" }, 400);
+        }
+
+        if (body.isStarted) {
+          const details = (body.details as Record<string, unknown>) ?? {};
+          currentTimer = {
+            isStarted: true,
+            startTime: new Date().toISOString(),
+            details,
+          };
+          log(method, url, `started: "${details.description ?? "(no description)"}"`);
+        } else {
+          currentTimer = { isStarted: false };
+          log(method, url, "stopped");
+        }
+        return json(res, currentTimer);
+      }
+
+      // GET /timeentries/recent
+      if (method === "GET" && route === "timeentries/recent") {
+        log(method, url, `${recentEntries.length} entries`);
+        return json(res, recentEntries);
+      }
+
+      // GET /scope
+      if (method === "GET" && route === "scope") {
+        log(method, url, `${scope.projects.length} projects`);
+        return json(res, scope);
+      }
     }
 
-    // GET /timeentries/recent
-    if (method === "GET" && route === "timeentries/recent") {
-      log(method, url, `${recentEntries.length} entries`);
-      return json(res, recentEntries);
-    }
-
-    // GET /scope
-    if (method === "GET" && route === "scope") {
-      log(method, url, `${scope.projects.length} projects`);
-      return json(res, scope);
-    }
+    log(method, url, "404");
+    json(res, { error: "Not found" }, 404);
+  } catch (err) {
+    log(method, url, `500 ${err}`);
+    json(res, { error: "Internal server error" }, 500);
   }
-
-  log(method, url, "404");
-  json(res, { error: "Not found" }, 404);
 });
 
 server.listen(PORT, () => {

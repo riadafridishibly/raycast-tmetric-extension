@@ -36,11 +36,9 @@ export interface TMetricTimerDetails {
   isBillable?: boolean;
 }
 
-export interface TMetricTimer {
-  isStarted: boolean;
-  startTime?: string;
-  details?: TMetricTimerDetails;
-}
+export type TMetricTimer =
+  | { isStarted: true; startTime: string; details?: TMetricTimerDetails }
+  | { isStarted: false };
 
 export interface TMetricTimeEntry {
   timeEntryId: number;

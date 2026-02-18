@@ -1,5 +1,5 @@
 import { Action, ActionPanel, List, showToast, Toast, Icon } from "@raycast/api";
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { TimerService } from "./services/timer-service";
 import { createApiClient } from "./api/api-factory";
 import { getPreferences } from "./lib/preferences";
@@ -23,23 +23,22 @@ export default function TimerStatusCommand() {
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const { apiToken, useMockApi } = getPreferences();
-  const api = createApiClient(apiToken, useMockApi);
-  const service = new TimerService(api);
+  const service = useMemo(() => new TimerService(createApiClient(apiToken, useMockApi)), []);
 
-  function stopTicking() {
+  const stopTicking = useCallback(() => {
     if (intervalRef.current) {
       clearInterval(intervalRef.current);
       intervalRef.current = null;
     }
-  }
+  }, []);
 
-  function startTicking(startTime: string) {
+  const startTicking = useCallback((startTime: string) => {
     stopTicking();
     setElapsed(computeElapsed(startTime));
     intervalRef.current = setInterval(() => {
       setElapsed(computeElapsed(startTime));
     }, 1000);
-  }
+  }, [stopTicking]);
 
   const loadStatus = useCallback(async () => {
     try {
@@ -55,14 +54,14 @@ export default function TimerStatusCommand() {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [service, startTicking, stopTicking]);
 
   useEffect(() => {
     loadStatus();
     return () => stopTicking();
-  }, []);
+  }, [loadStatus, stopTicking]);
 
-  async function handleStop() {
+  const handleStop = useCallback(async () => {
     try {
       await service.stopTimer();
       stopTicking();
@@ -71,7 +70,7 @@ export default function TimerStatusCommand() {
     } catch (error) {
       await showToast({ style: Toast.Style.Failure, title: "Failed to stop timer", message: String(error) });
     }
-  }
+  }, [service, stopTicking, loadStatus]);
 
   if (!isLoading && status && !status.isRunning) {
     return (

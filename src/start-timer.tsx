@@ -1,5 +1,5 @@
 import { Action, ActionPanel, Form, showToast, Toast, popToRoot } from "@raycast/api";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { TimerService } from "./services/timer-service";
 import { createApiClient } from "./api/api-factory";
 import { getPreferences } from "./lib/preferences";
@@ -11,8 +11,7 @@ export default function StartTimer() {
   const [isLoading, setIsLoading] = useState(true);
 
   const { apiToken, useMockApi } = getPreferences();
-  const api = createApiClient(apiToken, useMockApi);
-  const service = new TimerService(api);
+  const service = useMemo(() => new TimerService(createApiClient(apiToken, useMockApi)), []);
 
   useEffect(() => {
     async function loadProjects() {
@@ -26,11 +25,11 @@ export default function StartTimer() {
       }
     }
     loadProjects();
-  }, []);
+  }, [service]);
 
   async function handleSubmit(values: { description: string; projectId: string }) {
     try {
-      ensureTMetricAppRunning();
+      await ensureTMetricAppRunning();
       await service.startTimer({
         description: values.description,
         projectId: values.projectId ? Number(values.projectId) : undefined,

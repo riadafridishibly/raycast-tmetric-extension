@@ -81,6 +81,23 @@ describe("TimerService", () => {
 
       expect(status.isRunning).toBe(false);
     });
+
+    it("returns undefined projectName when projectId is not in scope", async () => {
+      await service.startTimer({ description: "Unknown project", projectId: 999 });
+      const status = await service.getStatus();
+
+      expect(status.isRunning).toBe(true);
+      expect(status.projectName).toBeUndefined();
+    });
+
+    it("returns running status without projectName when no projectId set", async () => {
+      await service.startTimer({ description: "No project" });
+      const status = await service.getStatus();
+
+      expect(status.isRunning).toBe(true);
+      expect(status.description).toBe("No project");
+      expect(status.projectName).toBeUndefined();
+    });
   });
 
   describe("getProjects", () => {

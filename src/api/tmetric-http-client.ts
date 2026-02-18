@@ -1,8 +1,8 @@
-import fetch from "node-fetch";
 import type { ITMetricApi } from "./tmetric-api";
 import type { TMetricUser, TMetricTimer, TMetricTimeEntry, TMetricAccountScope, StartTimerInput } from "../types";
 
 const DEFAULT_BASE_URL = "https://app.tmetric.com/api/v3";
+const REQUEST_TIMEOUT_MS = 10_000;
 
 export class TMetricHttpClient implements ITMetricApi {
   private token: string;
@@ -15,25 +15,42 @@ export class TMetricHttpClient implements ITMetricApi {
 
   private async request<T>(method: string, path: string, body?: unknown): Promise<T> {
     const url = `${this.baseUrl}${path}`;
-    const response = await fetch(url, {
-      method,
-      headers: {
-        Authorization: `Bearer ${this.token}`,
-        "Content-Type": "application/json",
-      },
-      body: body ? JSON.stringify(body) : undefined,
-    });
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
-    if (!response.ok) {
-      const text = await response.text().catch(() => "");
-      throw new Error(`TMetric API error: ${response.status} ${response.statusText}${text ? ` — ${text}` : ""}`);
+    const headers: Record<string, string> = {
+      Authorization: `Bearer ${this.token}`,
+    };
+    if (body) {
+      headers["Content-Type"] = "application/json";
     }
 
-    const text = await response.text();
-    if (!text) {
-      return {} as T;
+    try {
+      const response = await fetch(url, {
+        method,
+        headers,
+        body: body ? JSON.stringify(body) : undefined,
+        signal: controller.signal,
+      });
+
+      if (!response.ok) {
+        const errorBody = await response.text().catch(() => "");
+        throw new Error(`TMetric API error: ${response.status} ${response.statusText}${errorBody ? ` — ${errorBody}` : ""}`);
+      }
+
+      const text = await response.text();
+      if (!text) {
+        return { isStarted: false } as T;
+      }
+
+      try {
+        return JSON.parse(text) as T;
+      } catch {
+        throw new Error(`TMetric API returned invalid JSON: ${text.slice(0, 200)}`);
+      }
+    } finally {
+      clearTimeout(timeoutId);
     }
-    return JSON.parse(text) as T;
   }
 
   async getUser(): Promise<TMetricUser> {
