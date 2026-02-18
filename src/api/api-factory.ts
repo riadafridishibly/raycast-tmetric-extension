@@ -1,11 +1,12 @@
 import type { ITMetricApi } from "./tmetric-api";
 import { TMetricHttpClient } from "./tmetric-http-client";
-import { TMetricApiMock } from "./tmetric-api-mock";
+
+const MOCK_SERVER_URL = "http://localhost:19378/api/v3";
 
 let apiClient: ITMetricApi | null = null;
 
 export function createApiClient(token: string, useMock: boolean = false): ITMetricApi {
-  apiClient = useMock ? new TMetricApiMock() : new TMetricHttpClient(token);
+  apiClient = useMock ? new TMetricHttpClient(token, MOCK_SERVER_URL) : new TMetricHttpClient(token);
   return apiClient;
 }
 

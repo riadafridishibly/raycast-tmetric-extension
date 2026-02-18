@@ -5,7 +5,9 @@
   "description": "Start and stop TMetric timers from Raycast",
   "icon": "command-icon.png",
   "author": "you",
-  "categories": ["Productivity"],
+  "categories": [
+    "Productivity"
+  ],
   "license": "MIT",
   "commands": [
     {
@@ -38,7 +40,7 @@
     {
       "name": "useMockApi",
       "title": "Use Mock API",
-      "description": "Use a fake in-memory API instead of real TMetric (for testing)",
+      "description": "Use the local mock server instead of real TMetric (for testing)",
       "type": "checkbox",
       "default": false,
       "label": "Enable Mock API",
@@ -54,14 +56,18 @@
     "@raycast/eslint-config": "^1.0.11",
     "@types/node": "~22.13.4",
     "@types/react": "^19.0.8",
+    "concurrently": "^9.2.1",
     "eslint": "^8.57.0",
     "prettier": "^3.4.2",
+    "tsx": "^4.21.0",
     "typescript": "^5.7.3",
     "vitest": "^3.0.5"
   },
   "scripts": {
     "build": "ray build",
-    "dev": "ray develop",
+    "dev": "concurrently --names server,raycast --prefix-colors blue,green \"tsx server/mock-server.ts\" \"ray develop\"",
+    "dev:raycast": "ray develop",
+    "dev:server": "tsx server/mock-server.ts",
     "fix-lint": "ray lint --fix",
     "lint": "ray lint",
     "publish": "npx @raycast/api@latest publish",

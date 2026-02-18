@@ -2,17 +2,19 @@ import fetch from "node-fetch";
 import type { ITMetricApi } from "./tmetric-api";
 import type { TMetricUser, TMetricTimer, TMetricTimeEntry, TMetricAccountScope, StartTimerInput } from "../types";
 
-const BASE_URL = "https://app.tmetric.com/api/v3";
+const DEFAULT_BASE_URL = "https://app.tmetric.com/api/v3";
 
 export class TMetricHttpClient implements ITMetricApi {
   private token: string;
+  private baseUrl: string;
 
-  constructor(token: string) {
+  constructor(token: string, baseUrl: string = DEFAULT_BASE_URL) {
     this.token = token;
+    this.baseUrl = baseUrl;
   }
 
   private async request<T>(method: string, path: string, body?: unknown): Promise<T> {
-    const url = `${BASE_URL}${path}`;
+    const url = `${this.baseUrl}${path}`;
     const response = await fetch(url, {
       method,
       headers: {

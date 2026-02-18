@@ -10,7 +10,7 @@
 type ExtensionPreferences = {
   /** API Token - Your TMetric API token */
   "apiToken": string,
-  /** Use Mock API - Use a fake in-memory API instead of real TMetric (for testing) */
+  /** Use Mock API - Use the local mock server instead of real TMetric (for testing) */
   "useMockApi": boolean
 }
 
