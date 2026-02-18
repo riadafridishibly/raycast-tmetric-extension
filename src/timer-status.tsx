@@ -66,6 +66,7 @@ export default function TimerStatusCommand() {
   }
 
   useEffect(() => {
+    cancelledRef.current = false;
     loadStatus();
     return () => {
       cancelledRef.current = true;
