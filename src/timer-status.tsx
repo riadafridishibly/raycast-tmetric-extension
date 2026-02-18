@@ -1,8 +1,9 @@
 import { Action, ActionPanel, List, showToast, Toast, Icon } from "@raycast/api";
-import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { TimerService } from "./services/timer-service";
 import { createApiClient } from "./api/api-factory";
 import { getPreferences } from "./lib/preferences";
+import { logger } from "./lib/logger";
 import type { TimerStatus as TimerStatusType } from "./types";
 
 function formatElapsed(seconds: number): string {
@@ -23,26 +24,28 @@ export default function TimerStatusCommand() {
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const { apiToken, useMockApi } = getPreferences();
-  const service = useMemo(() => new TimerService(createApiClient(apiToken, useMockApi)), []);
+  const serviceRef = useRef(new TimerService(createApiClient(apiToken, useMockApi)));
 
-  const stopTicking = useCallback(() => {
+  function stopTicking() {
     if (intervalRef.current) {
       clearInterval(intervalRef.current);
       intervalRef.current = null;
     }
-  }, []);
+  }
 
-  const startTicking = useCallback((startTime: string) => {
+  function startTicking(startTime: string) {
     stopTicking();
     setElapsed(computeElapsed(startTime));
     intervalRef.current = setInterval(() => {
       setElapsed(computeElapsed(startTime));
     }, 1000);
-  }, [stopTicking]);
+  }
 
-  const loadStatus = useCallback(async () => {
+  // loadStatus is safe to call from effects and handlers — serviceRef is stable.
+  // Not wrapped in useCallback because it has no hook dependencies to track.
+  async function loadStatus() {
     try {
-      const result = await service.getStatus();
+      const result = await serviceRef.current.getStatus();
       setStatus(result);
       if (result.isRunning && result.startTime) {
         startTicking(result.startTime);
@@ -50,27 +53,30 @@ export default function TimerStatusCommand() {
         stopTicking();
       }
     } catch (error) {
+      logger.error("Failed to load timer status", error);
       await showToast({ style: Toast.Style.Failure, title: "Failed to load status", message: String(error) });
     } finally {
       setIsLoading(false);
     }
-  }, [service, startTicking, stopTicking]);
+  }
 
+  // Runs exactly once on mount. No dependency array risk — serviceRef is a ref.
   useEffect(() => {
     loadStatus();
     return () => stopTicking();
-  }, [loadStatus, stopTicking]);
+  }, []);
 
   const handleStop = useCallback(async () => {
     try {
-      await service.stopTimer();
+      await serviceRef.current.stopTimer();
       stopTicking();
       await showToast({ style: Toast.Style.Success, title: "Timer stopped" });
       await loadStatus();
     } catch (error) {
+      logger.error("Failed to stop timer", error);
       await showToast({ style: Toast.Style.Failure, title: "Failed to stop timer", message: String(error) });
     }
-  }, [service, stopTicking, loadStatus]);
+  }, []);
 
   if (!isLoading && status && !status.isRunning) {
     return (

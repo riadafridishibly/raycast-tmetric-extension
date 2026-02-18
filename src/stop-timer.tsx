@@ -2,6 +2,7 @@ import { showHUD } from "@raycast/api";
 import { TimerService } from "./services/timer-service";
 import { createApiClient } from "./api/api-factory";
 import { getPreferences } from "./lib/preferences";
+import { logger } from "./lib/logger";
 
 export default async function StopTimer() {
   const { apiToken, useMockApi } = getPreferences();
@@ -19,6 +20,8 @@ export default async function StopTimer() {
     const desc = status.description ? `: ${status.description}` : "";
     await showHUD(`Timer stopped${desc}`);
   } catch (error) {
-    await showHUD(`Failed to stop timer: ${String(error)}`);
+    logger.error("Failed to stop timer", error);
+    const message = error instanceof Error ? error.message : String(error);
+    await showHUD(`Failed: ${message.slice(0, 80)}`);
   }
 }

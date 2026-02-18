@@ -1,9 +1,10 @@
 import { Action, ActionPanel, Form, showToast, Toast, popToRoot } from "@raycast/api";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useRef } from "react";
 import { TimerService } from "./services/timer-service";
 import { createApiClient } from "./api/api-factory";
 import { getPreferences } from "./lib/preferences";
 import { ensureTMetricAppRunning } from "./services/app-launcher";
+import { logger } from "./lib/logger";
 import type { TMetricProject } from "./types";
 
 export default function StartTimer() {
@@ -11,32 +12,36 @@ export default function StartTimer() {
   const [isLoading, setIsLoading] = useState(true);
 
   const { apiToken, useMockApi } = getPreferences();
-  const service = useMemo(() => new TimerService(createApiClient(apiToken, useMockApi)), []);
+  const serviceRef = useRef(new TimerService(createApiClient(apiToken, useMockApi)));
 
   useEffect(() => {
+    let cancelled = false;
     async function loadProjects() {
       try {
-        const result = await service.getProjects();
-        setProjects(result);
+        const result = await serviceRef.current.getProjects();
+        if (!cancelled) setProjects(result);
       } catch (error) {
-        await showToast({ style: Toast.Style.Failure, title: "Failed to load projects", message: String(error) });
+        logger.error("Failed to load projects", error);
+        if (!cancelled) await showToast({ style: Toast.Style.Failure, title: "Failed to load projects", message: String(error) });
       } finally {
-        setIsLoading(false);
+        if (!cancelled) setIsLoading(false);
       }
     }
     loadProjects();
-  }, [service]);
+    return () => { cancelled = true; };
+  }, []);
 
   async function handleSubmit(values: { description: string; projectId: string }) {
     try {
       await ensureTMetricAppRunning();
-      await service.startTimer({
+      await serviceRef.current.startTimer({
         description: values.description,
         projectId: values.projectId ? Number(values.projectId) : undefined,
       });
       await showToast({ style: Toast.Style.Success, title: "Timer started" });
       await popToRoot();
     } catch (error) {
+      logger.error("Failed to start timer", error);
       await showToast({ style: Toast.Style.Failure, title: "Failed to start timer", message: String(error) });
     }
   }

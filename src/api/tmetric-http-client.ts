@@ -1,5 +1,6 @@
 import type { ITMetricApi } from "./tmetric-api";
 import type { TMetricUser, TMetricTimer, TMetricTimeEntry, TMetricAccountScope, StartTimerInput } from "../types";
+import { logger } from "../lib/logger";
 
 const DEFAULT_BASE_URL = "https://app.tmetric.com/api/v3";
 const REQUEST_TIMEOUT_MS = 10_000;
@@ -16,7 +17,8 @@ export class TMetricHttpClient implements ITMetricApi {
   private async request<T>(method: string, path: string, body?: unknown): Promise<T> {
     const url = `${this.baseUrl}${path}`;
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+    const timeoutId = setTimeout(() => controller.abort("Request timed out"), REQUEST_TIMEOUT_MS);
+    const start = Date.now();
 
     const headers: Record<string, string> = {
       Authorization: `Bearer ${this.token}`,
@@ -24,6 +26,8 @@ export class TMetricHttpClient implements ITMetricApi {
     if (body) {
       headers["Content-Type"] = "application/json";
     }
+
+    logger.request(method, path);
 
     try {
       const response = await fetch(url, {
@@ -33,21 +37,34 @@ export class TMetricHttpClient implements ITMetricApi {
         signal: controller.signal,
       });
 
+      logger.response(method, path, response.status, Date.now() - start);
+
       if (!response.ok) {
         const errorBody = await response.text().catch(() => "");
-        throw new Error(`TMetric API error: ${response.status} ${response.statusText}${errorBody ? ` — ${errorBody}` : ""}`);
+        const msg = `TMetric API error: ${response.status} ${response.statusText}${errorBody ? ` — ${errorBody}` : ""}`;
+        logger.error(msg);
+        throw new Error(msg);
       }
 
       const text = await response.text();
       if (!text) {
-        return { isStarted: false } as T;
+        throw new Error(`TMetric API returned empty response for ${method} ${path}`);
       }
 
       try {
         return JSON.parse(text) as T;
       } catch {
-        throw new Error(`TMetric API returned invalid JSON: ${text.slice(0, 200)}`);
+        const msg = `TMetric API returned invalid JSON: ${text.slice(0, 200)}`;
+        logger.error(msg);
+        throw new Error(msg);
       }
+    } catch (err) {
+      if (err instanceof DOMException && err.name === "AbortError") {
+        const msg = `TMetric API request timed out after ${REQUEST_TIMEOUT_MS}ms: ${method} ${path}`;
+        logger.error(msg);
+        throw new Error(msg);
+      }
+      throw err;
     } finally {
       clearTimeout(timeoutId);
     }
