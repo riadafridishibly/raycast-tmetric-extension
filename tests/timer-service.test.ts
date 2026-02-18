@@ -109,6 +109,77 @@ describe("TimerService", () => {
     });
   });
 
+  describe("getDescriptionSuggestions", () => {
+    it("deduplicates by note (case-insensitive) and counts occurrences", async () => {
+      const suggestions = await service.getDescriptionSuggestions();
+      const standupSuggestion = suggestions.find((s) => s.description.toLowerCase().includes("standup"));
+      expect(standupSuggestion).toBeDefined();
+      expect(standupSuggestion!.count).toBe(2);
+    });
+
+    it("preserves casing from the most recent occurrence", async () => {
+      const suggestions = await service.getDescriptionSuggestions();
+      const standupSuggestion = suggestions.find((s) => s.description.toLowerCase().includes("standup"));
+      // The most recent entry (1 day ago) has "Standup + planning" (capital S)
+      expect(standupSuggestion!.description).toBe("Standup + planning");
+    });
+
+    it("filters out empty and whitespace-only notes", async () => {
+      const suggestions = await service.getDescriptionSuggestions();
+      const emptyNotes = suggestions.filter((s) => s.description.trim() === "");
+      expect(emptyNotes).toHaveLength(0);
+    });
+
+    it("trims whitespace from notes", async () => {
+      const suggestions = await service.getDescriptionSuggestions();
+      const codeReview = suggestions.find((s) => s.description === "Code review");
+      expect(codeReview).toBeDefined();
+    });
+
+    it("tracks count correctly for entries appearing multiple times", async () => {
+      const suggestions = await service.getDescriptionSuggestions();
+      const featureWork = suggestions.find((s) => s.description === "Feature work");
+      expect(featureWork).toBeDefined();
+      expect(featureWork!.count).toBe(3);
+    });
+
+    it("sorts by most recently used first", async () => {
+      const suggestions = await service.getDescriptionSuggestions();
+      // "Standup + planning" (1 day ago) should come before "Feature work" (3 days ago)
+      const standupIdx = suggestions.findIndex((s) => s.description.toLowerCase().includes("standup"));
+      const featureIdx = suggestions.findIndex((s) => s.description === "Feature work");
+      expect(standupIdx).toBeLessThan(featureIdx);
+    });
+
+    it("associates lastProject from the most recent occurrence", async () => {
+      const suggestions = await service.getDescriptionSuggestions();
+      const standupSuggestion = suggestions.find((s) => s.description.toLowerCase().includes("standup"));
+      expect(standupSuggestion!.lastProject).toEqual({ id: 101, name: "Project Alpha" });
+    });
+
+    it("returns correct number of unique descriptions", async () => {
+      const suggestions = await service.getDescriptionSuggestions();
+      // "Standup + planning" (x2), "Feature work" (x3), "Code review" (x1) = 3 unique
+      expect(suggestions).toHaveLength(3);
+    });
+
+    it("returns empty array when no entries have notes", async () => {
+      mock.timeEntries = [
+        {
+          id: 100,
+          startTime: new Date().toISOString(),
+          endTime: new Date().toISOString(),
+          project: null,
+          note: "",
+          tags: [],
+          isBillable: false,
+        },
+      ];
+      const suggestions = await service.getDescriptionSuggestions();
+      expect(suggestions).toHaveLength(0);
+    });
+  });
+
   describe("full workflow", () => {
     it("start → status → stop → status", async () => {
       // Start

@@ -7,4 +7,5 @@ export interface ITMetricApi {
   stopTimer(accountId: number): Promise<void>;
   getRecentTimeEntries(accountId: number): Promise<TMetricRecentEntry[]>;
   getProjects(accountId: number): Promise<TMetricProject[]>;
+  getTimeEntries(accountId: number, startDate: string, endDate: string): Promise<TMetricTimeEntry[]>;
 }

@@ -46,6 +46,13 @@ export interface TimerStatus {
   elapsedSeconds?: number;
 }
 
+export interface DescriptionSuggestion {
+  description: string;
+  lastProject: { id: number; name: string } | null;
+  lastUsed: string;
+  count: number;
+}
+
 export interface ExtensionPreferences {
   apiToken: string;
   useMockApi: boolean;

@@ -6,7 +6,7 @@ import type {
   TMetricProject,
   StartTimerInput,
 } from "../../src/types";
-import { mockUser, mockProjects, mockRecentEntries } from "../fixtures/api-responses";
+import { mockUser, mockProjects, mockRecentEntries, mockTimeEntries } from "../fixtures/api-responses";
 
 interface ApiCall {
   method: string;
@@ -21,6 +21,7 @@ export class TMetricApiMock implements ITMetricApi {
   user: TMetricUser = { ...mockUser };
   projects: TMetricProject[] = mockProjects.map((p) => ({ ...p }));
   recentEntries: TMetricRecentEntry[] = mockRecentEntries.map((e) => ({ ...e }));
+  timeEntries: TMetricTimeEntry[] = mockTimeEntries.map((e) => ({ ...e }));
 
   private record(method: string, ...args: unknown[]): void {
     this.calls.push({ method, args });
@@ -69,11 +70,22 @@ export class TMetricApiMock implements ITMetricApi {
     return this.projects;
   }
 
+  async getTimeEntries(accountId: number, startDate: string, endDate: string): Promise<TMetricTimeEntry[]> {
+    this.record("getTimeEntries", accountId, startDate, endDate);
+    const start = new Date(startDate).getTime();
+    const end = new Date(endDate + "T23:59:59.999Z").getTime();
+    return this.timeEntries.filter((e) => {
+      const t = new Date(e.startTime).getTime();
+      return t >= start && t <= end;
+    });
+  }
+
   reset(): void {
     this.calls = [];
     this.latestEntry = null;
     this.user = { ...mockUser };
     this.projects = mockProjects.map((p) => ({ ...p }));
     this.recentEntries = mockRecentEntries.map((e) => ({ ...e }));
+    this.timeEntries = mockTimeEntries.map((e) => ({ ...e }));
   }
 }

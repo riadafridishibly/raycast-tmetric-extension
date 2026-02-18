@@ -106,4 +106,8 @@ export class TMetricHttpClient implements ITMetricApi {
   async getProjects(accountId: number): Promise<TMetricProject[]> {
     return this.request<TMetricProject[]>("GET", `/accounts/${accountId}/timeentries/projects`);
   }
+
+  async getTimeEntries(accountId: number, startDate: string, endDate: string): Promise<TMetricTimeEntry[]> {
+    return this.request<TMetricTimeEntry[]>("GET", `/accounts/${accountId}/timeentries?startDate=${startDate}&endDate=${endDate}`);
+  }
 }

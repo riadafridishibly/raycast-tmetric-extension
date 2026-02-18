@@ -29,6 +29,22 @@ const projects = [
   { id: 103, name: "Internal Tasks", status: "active" },
 ];
 
+function daysAgo(n: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() - n);
+  return d.toISOString();
+}
+
+const timeEntries = [
+  { id: 1, startTime: daysAgo(1), endTime: daysAgo(1), project: { id: 101, name: "Project Alpha" }, note: "Standup + planning", tags: [], isBillable: false },
+  { id: 2, startTime: daysAgo(2), endTime: daysAgo(2), project: { id: 101, name: "Project Alpha" }, note: "standup + planning", tags: [], isBillable: false },
+  { id: 3, startTime: daysAgo(3), endTime: daysAgo(3), project: { id: 102, name: "Project Beta" }, note: "Feature work", tags: [], isBillable: false },
+  { id: 4, startTime: daysAgo(5), endTime: daysAgo(5), project: { id: 102, name: "Project Beta" }, note: "Feature work", tags: [], isBillable: false },
+  { id: 5, startTime: daysAgo(7), endTime: daysAgo(7), project: { id: 102, name: "Project Beta" }, note: "Feature work", tags: [], isBillable: false },
+  { id: 6, startTime: daysAgo(4), endTime: daysAgo(4), project: null, note: "", tags: [], isBillable: false },
+  { id: 7, startTime: daysAgo(6), endTime: daysAgo(6), project: { id: 103, name: "Internal Tasks" }, note: "Code review", tags: [], isBillable: false },
+];
+
 const recentEntries = [
   {
     project: { id: 101, name: "Project Alpha" },
@@ -146,6 +162,21 @@ const server = http.createServer(async (req, res) => {
         log(method, url, `${projects.length} projects`);
         return json(res, projects);
       }
+
+      // GET /timeentries?startDate=...&endDate=...
+      if (method === "GET" && route.startsWith("timeentries?")) {
+        const params = new URLSearchParams(route.split("?")[1]);
+        const startDate = params.get("startDate");
+        const endDate = params.get("endDate");
+        const filtered = timeEntries.filter((e) => {
+          const t = new Date(e.startTime).getTime();
+          const start = startDate ? new Date(startDate).getTime() : 0;
+          const end = endDate ? new Date(endDate + "T23:59:59.999Z").getTime() : Infinity;
+          return t >= start && t <= end;
+        });
+        log(method, url, `${filtered.length} entries`);
+        return json(res, filtered);
+      }
     }
 
     log(method, url, "404");
@@ -165,5 +196,6 @@ server.listen(PORT, () => {
   console.log("  POST /api/v3/accounts/:id/timeentries/break");
   console.log("  GET  /api/v3/accounts/:id/timeentries/recent");
   console.log("  GET  /api/v3/accounts/:id/timeentries/projects");
+  console.log("  GET  /api/v3/accounts/:id/timeentries?startDate=&endDate=");
   console.log("");
 });

@@ -1,5 +1,5 @@
 import type { ITMetricApi } from "../api/tmetric-api";
-import type { StartTimerInput, TimerStatus, TMetricProject } from "../types";
+import type { StartTimerInput, TimerStatus, TMetricProject, DescriptionSuggestion } from "../types";
 import { logger } from "../lib/logger";
 
 export class TimerService {
@@ -66,6 +66,50 @@ export class TimerService {
     return this.dedup("getProjects", async () => {
       const accountId = await this.getAccountId();
       return this.api.getProjects(accountId);
+    });
+  }
+
+  async getDescriptionSuggestions(): Promise<DescriptionSuggestion[]> {
+    return this.dedup("getDescriptionSuggestions", async () => {
+      const accountId = await this.getAccountId();
+      const endDate = new Date();
+      const startDate = new Date(endDate);
+      startDate.setDate(startDate.getDate() - 30);
+
+      const fmt = (d: Date) => d.toISOString().slice(0, 10);
+      const entries = await this.api.getTimeEntries(accountId, fmt(startDate), fmt(endDate));
+
+      const map = new Map<string, DescriptionSuggestion>();
+
+      for (const entry of entries) {
+        const trimmed = entry.note.trim();
+        if (!trimmed) continue;
+
+        const key = trimmed.toLowerCase();
+        const existing = map.get(key);
+
+        if (!existing) {
+          map.set(key, {
+            description: trimmed,
+            lastProject: entry.project,
+            lastUsed: entry.startTime,
+            count: 1,
+          });
+        } else {
+          existing.count++;
+          if (entry.startTime > existing.lastUsed) {
+            existing.lastUsed = entry.startTime;
+            existing.description = trimmed;
+            existing.lastProject = entry.project;
+          }
+        }
+      }
+
+      return [...map.values()].sort((a, b) => {
+        const dateCompare = b.lastUsed.localeCompare(a.lastUsed);
+        if (dateCompare !== 0) return dateCompare;
+        return b.count - a.count;
+      });
     });
   }
 }
