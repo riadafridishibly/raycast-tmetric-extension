@@ -11,37 +11,40 @@ const user = {
   activeAccountId: 42,
 };
 
-let currentTimer: { isStarted: true; startTime: string; details?: Record<string, unknown> } | { isStarted: false } = {
-  isStarted: false,
-};
+let latestEntry: {
+  id: number;
+  startTime: string;
+  endTime: string | null;
+  project: { id: number; name: string } | null;
+  note: string;
+  tags: { id: number; name: string }[];
+  isBillable: boolean;
+} | null = null;
 
-const scope = {
-  projects: [
-    { projectId: 101, projectName: "Project Alpha", isBillable: true, clientId: 1, clientName: "Client A" },
-    { projectId: 102, projectName: "Project Beta", isBillable: false },
-    { projectId: 103, projectName: "Internal Tasks", isBillable: false },
-  ],
-  tags: [
-    { tagId: 201, tagName: "dev" },
-    { tagId: 202, tagName: "design" },
-  ],
-  clients: [{ clientId: 1, clientName: "Client A" }],
-};
+let nextEntryId = 5000;
+
+const projects = [
+  { id: 101, name: "Project Alpha", client: { id: 1, name: "Client A" }, status: "active" },
+  { id: 102, name: "Project Beta", status: "active" },
+  { id: 103, name: "Internal Tasks", status: "active" },
+];
 
 const recentEntries = [
   {
-    timeEntryId: 5001,
-    startTime: "2026-01-15T09:00:00Z",
-    endTime: "2026-01-15T10:30:00Z",
-    details: { description: "Standup + planning", projectId: 101 },
-    projectName: "Project Alpha",
+    project: { id: 101, name: "Project Alpha" },
+    task: null,
+    note: "Standup + planning",
+    tags: [],
+    isBillable: false,
+    isPinned: false,
   },
   {
-    timeEntryId: 5002,
-    startTime: "2026-01-15T10:45:00Z",
-    endTime: "2026-01-15T12:00:00Z",
-    details: { description: "Feature work", projectId: 102 },
-    projectName: "Project Beta",
+    project: { id: 102, name: "Project Beta" },
+    task: null,
+    note: "Feature work",
+    tags: [],
+    isBillable: false,
+    isPinned: false,
   },
 ];
 
@@ -84,14 +87,19 @@ const server = http.createServer(async (req, res) => {
     if (accountMatch) {
       const route = accountMatch[2];
 
-      // GET /timer
-      if (method === "GET" && route === "timer") {
-        log(method, url, currentTimer.isStarted ? "running" : "stopped");
-        return json(res, currentTimer);
+      // GET /timeentries/latest
+      if (method === "GET" && route === "timeentries/latest") {
+        log(method, url, latestEntry ? (latestEntry.endTime == null ? "running" : "stopped") : "empty");
+        if (!latestEntry) {
+          res.writeHead(204);
+          res.end();
+          return;
+        }
+        return json(res, latestEntry);
       }
 
-      // PUT /timer (start or stop)
-      if (method === "PUT" && route === "timer") {
+      // POST /timeentries (start timer)
+      if (method === "POST" && route === "timeentries") {
         let body: Record<string, unknown>;
         try {
           body = JSON.parse(await readBody(req));
@@ -100,19 +108,31 @@ const server = http.createServer(async (req, res) => {
           return json(res, { error: "Invalid JSON body" }, 400);
         }
 
-        if (body.isStarted) {
-          const details = (body.details as Record<string, unknown>) ?? {};
-          currentTimer = {
-            isStarted: true,
-            startTime: new Date().toISOString(),
-            details,
-          };
-          log(method, url, `started: "${details.description ?? "(no description)"}"`);
-        } else {
-          currentTimer = { isStarted: false };
-          log(method, url, "stopped");
+        const project = body.project as { id: number } | null;
+        const matchedProject = project ? projects.find((p) => p.id === project.id) : null;
+
+        latestEntry = {
+          id: nextEntryId++,
+          startTime: new Date().toISOString(),
+          endTime: null,
+          project: matchedProject ? { id: matchedProject.id, name: matchedProject.name } : null,
+          note: (body.note as string) ?? "",
+          tags: [],
+          isBillable: (body.isBillable as boolean) ?? false,
+        };
+        log(method, url, `started: "${latestEntry.note}"`);
+        return json(res, latestEntry);
+      }
+
+      // POST /timeentries/break (stop timer)
+      if (method === "POST" && route === "timeentries/break") {
+        if (latestEntry && latestEntry.endTime == null) {
+          latestEntry = { ...latestEntry, endTime: new Date().toISOString() };
         }
-        return json(res, currentTimer);
+        log(method, url, "stopped");
+        res.writeHead(204);
+        res.end();
+        return;
       }
 
       // GET /timeentries/recent
@@ -121,10 +141,10 @@ const server = http.createServer(async (req, res) => {
         return json(res, recentEntries);
       }
 
-      // GET /scope
-      if (method === "GET" && route === "scope") {
-        log(method, url, `${scope.projects.length} projects`);
-        return json(res, scope);
+      // GET /timeentries/projects
+      if (method === "GET" && route === "timeentries/projects") {
+        log(method, url, `${projects.length} projects`);
+        return json(res, projects);
       }
     }
 
@@ -140,9 +160,10 @@ server.listen(PORT, () => {
   console.log(`\nTMetric mock server running on http://localhost:${PORT}`);
   console.log("Endpoints:");
   console.log("  GET  /api/v3/user");
-  console.log("  GET  /api/v3/accounts/:id/timer");
-  console.log("  PUT  /api/v3/accounts/:id/timer");
+  console.log("  GET  /api/v3/accounts/:id/timeentries/latest");
+  console.log("  POST /api/v3/accounts/:id/timeentries");
+  console.log("  POST /api/v3/accounts/:id/timeentries/break");
   console.log("  GET  /api/v3/accounts/:id/timeentries/recent");
-  console.log("  GET  /api/v3/accounts/:id/scope");
+  console.log("  GET  /api/v3/accounts/:id/timeentries/projects");
   console.log("");
 });

@@ -1,32 +1,26 @@
 import type { ITMetricApi } from "../../src/api/tmetric-api";
 import type {
   TMetricUser,
-  TMetricTimer,
   TMetricTimeEntry,
-  TMetricAccountScope,
+  TMetricRecentEntry,
+  TMetricProject,
   StartTimerInput,
 } from "../../src/types";
-import { mockUser, mockAccountScope, mockRecentEntries } from "../fixtures/api-responses";
+import { mockUser, mockProjects, mockRecentEntries } from "../fixtures/api-responses";
 
 interface ApiCall {
   method: string;
   args: unknown[];
 }
 
-function deepCopyScope(s: TMetricAccountScope): TMetricAccountScope {
-  return {
-    projects: s.projects.map((p) => ({ ...p })),
-    tags: s.tags.map((t) => ({ ...t })),
-    clients: s.clients.map((c) => ({ ...c })),
-  };
-}
+let nextEntryId = 9000;
 
 export class TMetricApiMock implements ITMetricApi {
   calls: ApiCall[] = [];
-  currentTimer: TMetricTimer = { isStarted: false };
+  latestEntry: TMetricTimeEntry | null = null;
   user: TMetricUser = { ...mockUser };
-  scope: TMetricAccountScope = deepCopyScope(mockAccountScope);
-  recentEntries: TMetricTimeEntry[] = mockRecentEntries.map((e) => ({ ...e, details: { ...e.details } }));
+  projects: TMetricProject[] = mockProjects.map((p) => ({ ...p }));
+  recentEntries: TMetricRecentEntry[] = mockRecentEntries.map((e) => ({ ...e }));
 
   private record(method: string, ...args: unknown[]): void {
     this.calls.push({ method, args });
@@ -37,47 +31,49 @@ export class TMetricApiMock implements ITMetricApi {
     return this.user;
   }
 
-  async getTimer(accountId: number): Promise<TMetricTimer> {
-    this.record("getTimer", accountId);
-    return this.currentTimer;
+  async getLatestEntry(accountId: number): Promise<TMetricTimeEntry | null> {
+    this.record("getLatestEntry", accountId);
+    return this.latestEntry;
   }
 
-  async startTimer(accountId: number, input: StartTimerInput): Promise<TMetricTimer> {
+  async startTimer(accountId: number, input: StartTimerInput): Promise<void> {
     this.record("startTimer", accountId, input);
-    this.currentTimer = {
-      isStarted: true,
+    const project = input.projectId != null
+      ? this.projects.find((p) => p.id === input.projectId) ?? null
+      : null;
+    this.latestEntry = {
+      id: nextEntryId++,
       startTime: new Date().toISOString(),
-      details: {
-        description: input.description,
-        projectId: input.projectId,
-        tagIds: input.tagIds,
-        isBillable: input.isBillable,
-      },
+      endTime: null,
+      project: project ? { id: project.id, name: project.name } : null,
+      note: input.description ?? "",
+      tags: [],
+      isBillable: input.isBillable ?? false,
     };
-    return this.currentTimer;
   }
 
-  async stopTimer(accountId: number): Promise<TMetricTimer> {
+  async stopTimer(accountId: number): Promise<void> {
     this.record("stopTimer", accountId);
-    this.currentTimer = { isStarted: false };
-    return this.currentTimer;
+    if (this.latestEntry && this.latestEntry.endTime == null) {
+      this.latestEntry = { ...this.latestEntry, endTime: new Date().toISOString() };
+    }
   }
 
-  async getRecentTimeEntries(accountId: number): Promise<TMetricTimeEntry[]> {
+  async getRecentTimeEntries(accountId: number): Promise<TMetricRecentEntry[]> {
     this.record("getRecentTimeEntries", accountId);
     return this.recentEntries;
   }
 
-  async getAccountScope(accountId: number): Promise<TMetricAccountScope> {
-    this.record("getAccountScope", accountId);
-    return this.scope;
+  async getProjects(accountId: number): Promise<TMetricProject[]> {
+    this.record("getProjects", accountId);
+    return this.projects;
   }
 
   reset(): void {
     this.calls = [];
-    this.currentTimer = { isStarted: false };
+    this.latestEntry = null;
     this.user = { ...mockUser };
-    this.scope = deepCopyScope(mockAccountScope);
-    this.recentEntries = mockRecentEntries.map((e) => ({ ...e, details: { ...e.details } }));
+    this.projects = mockProjects.map((p) => ({ ...p }));
+    this.recentEntries = mockRecentEntries.map((e) => ({ ...e }));
   }
 }

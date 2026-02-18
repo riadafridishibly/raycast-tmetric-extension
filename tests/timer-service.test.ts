@@ -104,8 +104,8 @@ describe("TimerService", () => {
     it("fetches projects from account scope", async () => {
       const projects = await service.getProjects();
       expect(projects).toHaveLength(3);
-      expect(projects[0].projectName).toBe("Project Alpha");
-      expect(projects[1].projectName).toBe("Project Beta");
+      expect(projects[0].name).toBe("Project Alpha");
+      expect(projects[1].name).toBe("Project Beta");
     });
   });
 

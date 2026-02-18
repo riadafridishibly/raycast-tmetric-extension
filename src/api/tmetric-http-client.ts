@@ -1,5 +1,5 @@
 import type { ITMetricApi } from "./tmetric-api";
-import type { TMetricUser, TMetricTimer, TMetricTimeEntry, TMetricAccountScope, StartTimerInput } from "../types";
+import type { TMetricUser, TMetricTimeEntry, TMetricRecentEntry, TMetricProject, StartTimerInput } from "../types";
 import { logger } from "../lib/logger";
 
 const DEFAULT_BASE_URL = "https://app.tmetric.com/api/v3";
@@ -77,33 +77,33 @@ export class TMetricHttpClient implements ITMetricApi {
     return this.request<TMetricUser>("GET", "/user");
   }
 
-  async getTimer(accountId: number): Promise<TMetricTimer> {
-    return this.request<TMetricTimer>("GET", `/accounts/${accountId}/timer`);
+  async getLatestEntry(accountId: number): Promise<TMetricTimeEntry | null> {
+    return this.request<TMetricTimeEntry | null>("GET", `/accounts/${accountId}/timeentries/latest`, undefined, true);
   }
 
-  async startTimer(accountId: number, input: StartTimerInput): Promise<TMetricTimer> {
-    return this.request<TMetricTimer>("PUT", `/accounts/${accountId}/timer`, {
-      isStarted: true,
-      details: {
-        description: input.description,
-        projectId: input.projectId,
-        tagIds: input.tagIds,
-        isBillable: input.isBillable,
-      },
-    });
-  }
-
-  async stopTimer(accountId: number): Promise<TMetricTimer> {
-    return this.request<TMetricTimer>("PUT", `/accounts/${accountId}/timer`, {
-      isStarted: false,
+  async startTimer(accountId: number, input: StartTimerInput): Promise<void> {
+    await this.request<unknown>("POST", `/accounts/${accountId}/timeentries`, {
+      project: input.projectId != null ? { id: input.projectId } : null,
+      note: input.description ?? "",
+      startTime: null,
+      endTime: null,
+      tagIds: input.tagIds,
+      isBillable: input.isBillable,
     }, true);
   }
 
-  async getRecentTimeEntries(accountId: number): Promise<TMetricTimeEntry[]> {
-    return this.request<TMetricTimeEntry[]>("GET", `/accounts/${accountId}/timeentries/recent`);
+  async stopTimer(accountId: number): Promise<void> {
+    await this.request<unknown>("POST", `/accounts/${accountId}/timeentries/break`, {
+      startTime: null,
+      endTime: null,
+    }, true);
   }
 
-  async getAccountScope(accountId: number): Promise<TMetricAccountScope> {
-    return this.request<TMetricAccountScope>("GET", `/accounts/${accountId}/scope`);
+  async getRecentTimeEntries(accountId: number): Promise<TMetricRecentEntry[]> {
+    return this.request<TMetricRecentEntry[]>("GET", `/accounts/${accountId}/timeentries/recent`);
+  }
+
+  async getProjects(accountId: number): Promise<TMetricProject[]> {
+    return this.request<TMetricProject[]>("GET", `/accounts/${accountId}/timeentries/projects`);
   }
 }

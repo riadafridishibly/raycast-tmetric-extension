@@ -1,10 +1,10 @@
-import type { TMetricUser, TMetricTimer, TMetricTimeEntry, TMetricAccountScope, StartTimerInput } from "../types";
+import type { TMetricUser, TMetricTimeEntry, TMetricRecentEntry, TMetricProject, StartTimerInput } from "../types";
 
 export interface ITMetricApi {
   getUser(): Promise<TMetricUser>;
-  getTimer(accountId: number): Promise<TMetricTimer>;
-  startTimer(accountId: number, input: StartTimerInput): Promise<TMetricTimer>;
-  stopTimer(accountId: number): Promise<TMetricTimer>;
-  getRecentTimeEntries(accountId: number): Promise<TMetricTimeEntry[]>;
-  getAccountScope(accountId: number): Promise<TMetricAccountScope>;
+  getLatestEntry(accountId: number): Promise<TMetricTimeEntry | null>;
+  startTimer(accountId: number, input: StartTimerInput): Promise<void>;
+  stopTimer(accountId: number): Promise<void>;
+  getRecentTimeEntries(accountId: number): Promise<TMetricRecentEntry[]>;
+  getProjects(accountId: number): Promise<TMetricProject[]>;
 }

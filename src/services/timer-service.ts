@@ -34,31 +34,23 @@ export class TimerService {
 
   async getStatus(): Promise<TimerStatus> {
     const accountId = await this.getAccountId();
-    const timer = await this.api.getTimer(accountId);
+    const entry = await this.api.getLatestEntry(accountId);
 
-    if (!timer.isStarted) {
+    if (!entry || entry.endTime != null) {
       return { isRunning: false };
-    }
-
-    let projectName: string | undefined;
-    const projectId = timer.details?.projectId;
-    if (projectId != null) {
-      const scope = await this.api.getAccountScope(accountId);
-      projectName = scope.projects.find((p) => p.projectId === projectId)?.projectName;
     }
 
     return {
       isRunning: true,
-      description: timer.details?.description,
-      projectName,
-      startTime: timer.startTime,
-      elapsedSeconds: Math.floor((Date.now() - new Date(timer.startTime).getTime()) / 1000),
+      description: entry.note || undefined,
+      projectName: entry.project?.name,
+      startTime: entry.startTime,
+      elapsedSeconds: Math.floor((Date.now() - new Date(entry.startTime).getTime()) / 1000),
     };
   }
 
   async getProjects(): Promise<TMetricProject[]> {
     const accountId = await this.getAccountId();
-    const scope = await this.api.getAccountScope(accountId);
-    return scope.projects;
+    return this.api.getProjects(accountId);
   }
 }

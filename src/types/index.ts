@@ -6,46 +6,29 @@ export interface TMetricUser {
 }
 
 export interface TMetricProject {
-  projectId: number;
-  projectName: string;
-  clientId?: number;
-  clientName?: string;
+  id: number;
+  name: string;
+  client?: { id: number; name: string };
+  status?: string;
+}
+
+export interface TMetricTimeEntry {
+  id: number;
+  startTime: string;
+  endTime: string | null;
+  project: { id: number; name: string } | null;
+  note: string;
+  tags: { id: number; name: string }[];
   isBillable: boolean;
 }
 
-export interface TMetricTag {
-  tagId: number;
-  tagName: string;
-}
-
-export interface TMetricClient {
-  clientId: number;
-  clientName: string;
-}
-
-export interface TMetricAccountScope {
-  projects: TMetricProject[];
-  tags: TMetricTag[];
-  clients: TMetricClient[];
-}
-
-export interface TMetricTimerDetails {
-  description?: string;
-  projectId?: number;
-  tagIds?: number[];
-  isBillable?: boolean;
-}
-
-export type TMetricTimer =
-  | { isStarted: true; startTime: string; details?: TMetricTimerDetails }
-  | { isStarted: false };
-
-export interface TMetricTimeEntry {
-  timeEntryId: number;
-  startTime: string;
-  endTime: string;
-  details: TMetricTimerDetails;
-  projectName?: string;
+export interface TMetricRecentEntry {
+  project: { id: number; name: string } | null;
+  task: { id: number; name: string } | null;
+  note: string;
+  tags: { id: number; name: string }[];
+  isBillable: boolean;
+  isPinned: boolean;
 }
 
 export interface StartTimerInput {

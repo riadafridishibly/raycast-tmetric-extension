@@ -68,7 +68,7 @@ export default function StartTimer() {
       <Form.Dropdown id="projectId" title="Project" storeValue>
         <Form.Dropdown.Item value="" title="No Project" icon={Icon.Circle} />
         {projects.map((project) => (
-          <Form.Dropdown.Item key={project.projectId} value={String(project.projectId)} title={project.projectName} icon={Icon.Folder} />
+          <Form.Dropdown.Item key={project.id} value={String(project.id)} title={project.name} icon={Icon.Folder} />
         ))}
       </Form.Dropdown>
     </Form>
