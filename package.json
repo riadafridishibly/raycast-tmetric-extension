@@ -34,6 +34,15 @@
       "description": "Your TMetric API token",
       "type": "password",
       "required": true
+    },
+    {
+      "name": "useMockApi",
+      "title": "Use Mock API",
+      "description": "Use a fake in-memory API instead of real TMetric (for testing)",
+      "type": "checkbox",
+      "default": false,
+      "label": "Enable Mock API",
+      "required": false
     }
   ],
   "dependencies": {

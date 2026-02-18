@@ -4,8 +4,8 @@ import { createApiClient } from "./api/api-factory";
 import { getPreferences } from "./lib/preferences";
 
 export default async function StopTimer() {
-  const { apiToken } = getPreferences();
-  const api = createApiClient(apiToken);
+  const { apiToken, useMockApi } = getPreferences();
+  const api = createApiClient(apiToken, useMockApi);
   const service = new TimerService(api);
 
   try {

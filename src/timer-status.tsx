@@ -16,8 +16,8 @@ export default function TimerStatusCommand() {
   const [status, setStatus] = useState<TimerStatusType | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  const { apiToken } = getPreferences();
-  const api = createApiClient(apiToken);
+  const { apiToken, useMockApi } = getPreferences();
+  const api = createApiClient(apiToken, useMockApi);
   const service = new TimerService(api);
 
   const loadStatus = useCallback(async () => {

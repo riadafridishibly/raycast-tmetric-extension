@@ -67,4 +67,5 @@ export interface TimerStatus {
 
 export interface ExtensionPreferences {
   apiToken: string;
+  useMockApi: boolean;
 }
