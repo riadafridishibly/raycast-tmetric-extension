@@ -17,32 +17,33 @@ Start and stop TMetric timers from Raycast.
 ## Installation
 
 ```bash
-git clone <repo-url>
-cd raycast-tmetric-extension
-npm install
+curl -fsSL https://raw.githubusercontent.com/riadafridishibly/raycast-tmetric-extension/dev/install.sh | bash
+```
+
+Then import into Raycast: **Extensions** (⌘ ,) → **+** → **Add Script Directory** → select `~/.local/share/raycast-extensions/tmetric`.
+
+To update, re-run the same command. To uninstall:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/riadafridishibly/raycast-tmetric-extension/dev/install.sh | bash -s -- --uninstall
 ```
 
 ### Development mode
 
 ```bash
+git clone https://github.com/riadafridishibly/raycast-tmetric-extension.git
+cd raycast-tmetric-extension
+npm install
 npm run dev
 ```
 
 This opens the extension in Raycast in development mode. Raycast will prompt you to configure the **API Token** preference on first use.
 
-### Production build
-
-```bash
-npm run build
-```
-
-To install permanently in Raycast without dev mode, run `npm run build` then import the extension via Raycast's "Import Extension" option.
-
 ## Commands
 
 | Command | Mode | Description |
 |---------|------|-------------|
-| **Start Timer** | Form view | Enter a description, pick a project, and start a timer |
+| **Start Timer** | List view | Pick a description, then a project, and start a timer |
 | **Stop Timer** | No-view | Stops the running timer and shows a HUD confirmation |
 | **Timer Status** | List view | Shows the current timer with elapsed time and a stop action |
 
