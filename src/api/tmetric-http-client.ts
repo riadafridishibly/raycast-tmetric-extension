@@ -14,7 +14,7 @@ export class TMetricHttpClient implements ITMetricApi {
     this.baseUrl = baseUrl;
   }
 
-  private async request<T>(method: string, path: string, body?: unknown): Promise<T> {
+  private async request<T>(method: string, path: string, body?: unknown, allowEmpty?: boolean): Promise<T> {
     const url = `${this.baseUrl}${path}`;
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort("Request timed out"), REQUEST_TIMEOUT_MS);
@@ -23,7 +23,7 @@ export class TMetricHttpClient implements ITMetricApi {
     const headers: Record<string, string> = {
       Authorization: `Bearer ${this.token}`,
     };
-    if (body) {
+    if (body !== undefined) {
       headers["Content-Type"] = "application/json";
     }
 
@@ -48,6 +48,9 @@ export class TMetricHttpClient implements ITMetricApi {
 
       const text = await response.text();
       if (!text) {
+        if (allowEmpty) {
+          return undefined as unknown as T;
+        }
         throw new Error(`TMetric API returned empty response for ${method} ${path}`);
       }
 
@@ -59,7 +62,7 @@ export class TMetricHttpClient implements ITMetricApi {
         throw new Error(msg);
       }
     } catch (err) {
-      if (err instanceof DOMException && err.name === "AbortError") {
+      if (err instanceof Error && err.name === "AbortError") {
         const msg = `TMetric API request timed out after ${REQUEST_TIMEOUT_MS}ms: ${method} ${path}`;
         logger.error(msg);
         throw new Error(msg);
@@ -93,7 +96,7 @@ export class TMetricHttpClient implements ITMetricApi {
   async stopTimer(accountId: number): Promise<TMetricTimer> {
     return this.request<TMetricTimer>("PUT", `/accounts/${accountId}/timer`, {
       isStarted: false,
-    });
+    }, true);
   }
 
   async getRecentTimeEntries(accountId: number): Promise<TMetricTimeEntry[]> {

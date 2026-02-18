@@ -24,7 +24,10 @@ export default function TimerStatusCommand() {
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const { apiToken, useMockApi } = getPreferences();
-  const serviceRef = useRef(new TimerService(createApiClient(apiToken, useMockApi)));
+  const serviceRef = useRef<TimerService | null>(null);
+  if (!serviceRef.current) {
+    serviceRef.current = new TimerService(createApiClient(apiToken, useMockApi));
+  }
 
   function stopTicking() {
     if (intervalRef.current) {
@@ -41,11 +44,12 @@ export default function TimerStatusCommand() {
     }, 1000);
   }
 
-  // loadStatus is safe to call from effects and handlers — serviceRef is stable.
-  // Not wrapped in useCallback because it has no hook dependencies to track.
+  const cancelledRef = useRef(false);
+
   async function loadStatus() {
     try {
-      const result = await serviceRef.current.getStatus();
+      const result = await serviceRef.current!.getStatus();
+      if (cancelledRef.current) return;
       setStatus(result);
       if (result.isRunning && result.startTime) {
         startTicking(result.startTime);
@@ -54,21 +58,24 @@ export default function TimerStatusCommand() {
       }
     } catch (error) {
       logger.error("Failed to load timer status", error);
+      if (cancelledRef.current) return;
       await showToast({ style: Toast.Style.Failure, title: "Failed to load status", message: String(error) });
     } finally {
-      setIsLoading(false);
+      if (!cancelledRef.current) setIsLoading(false);
     }
   }
 
-  // Runs exactly once on mount. No dependency array risk — serviceRef is a ref.
   useEffect(() => {
     loadStatus();
-    return () => stopTicking();
+    return () => {
+      cancelledRef.current = true;
+      stopTicking();
+    };
   }, []);
 
   const handleStop = useCallback(async () => {
     try {
-      await serviceRef.current.stopTimer();
+      await serviceRef.current!.stopTimer();
       stopTicking();
       await showToast({ style: Toast.Style.Success, title: "Timer stopped" });
       await loadStatus();

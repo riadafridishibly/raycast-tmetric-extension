@@ -12,13 +12,16 @@ export default function StartTimer() {
   const [isLoading, setIsLoading] = useState(true);
 
   const { apiToken, useMockApi } = getPreferences();
-  const serviceRef = useRef(new TimerService(createApiClient(apiToken, useMockApi)));
+  const serviceRef = useRef<TimerService | null>(null);
+  if (!serviceRef.current) {
+    serviceRef.current = new TimerService(createApiClient(apiToken, useMockApi));
+  }
 
   useEffect(() => {
     let cancelled = false;
     async function loadProjects() {
       try {
-        const result = await serviceRef.current.getProjects();
+        const result = await serviceRef.current!.getProjects();
         if (!cancelled) setProjects(result);
       } catch (error) {
         logger.error("Failed to load projects", error);
@@ -34,7 +37,7 @@ export default function StartTimer() {
   async function handleSubmit(values: { description: string; projectId: string }) {
     try {
       await ensureTMetricAppRunning();
-      await serviceRef.current.startTimer({
+      await serviceRef.current!.startTimer({
         description: values.description,
         projectId: values.projectId ? Number(values.projectId) : undefined,
       });

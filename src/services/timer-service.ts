@@ -42,7 +42,7 @@ export class TimerService {
 
     let projectName: string | undefined;
     const projectId = timer.details?.projectId;
-    if (projectId) {
+    if (projectId != null) {
       const scope = await this.api.getAccountScope(accountId);
       projectName = scope.projects.find((p) => p.projectId === projectId)?.projectName;
     }

@@ -1,9 +1,9 @@
-import { appendFileSync, mkdirSync } from "fs";
+import { appendFile, writeFile, stat, mkdirSync } from "fs";
 import { join } from "path";
 
 let logFile: string | null = null;
-let lineCount = 0;
-const MAX_LINES = 2000;
+let initialized = false;
+const MAX_FILE_SIZE = 256 * 1024; // 256 KB
 
 function getLogFile(): string | null {
   if (logFile !== null) return logFile;
@@ -20,19 +20,36 @@ function getLogFile(): string | null {
   return logFile || null;
 }
 
+function truncateIfNeeded(file: string, callback: () => void) {
+  stat(file, (err, stats) => {
+    if (err || stats.size < MAX_FILE_SIZE) {
+      callback();
+      return;
+    }
+    // Truncate the file before writing the first line of this session
+    writeFile(file, "", () => callback());
+  });
+}
+
 function timestamp(): string {
   return new Date().toISOString();
 }
 
 function write(level: string, message: string) {
-  lineCount++;
-  if (lineCount > MAX_LINES) return;
-
   const file = getLogFile();
   if (!file) return;
 
+  const line = `[${timestamp()}] [${level}] ${message}\n`;
+
   try {
-    appendFileSync(file, `[${timestamp()}] [${level}] ${message}\n`);
+    if (!initialized) {
+      initialized = true;
+      truncateIfNeeded(file, () => {
+        appendFile(file, line, () => {});
+      });
+      return;
+    }
+    appendFile(file, line, () => {});
   } catch {
     // best-effort — never crash the extension
   }

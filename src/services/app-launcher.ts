@@ -10,9 +10,9 @@ export async function ensureTMetricAppRunning(): Promise<void> {
     await execFileAsync("pgrep", ["-x", "TMetric Desktop"], { timeout: TIMEOUT_MS });
     logger.info("TMetric Desktop is already running");
   } catch (err: unknown) {
-    const exitCode = (err as { code?: number }).code;
-    if (exitCode !== 1) {
-      // pgrep exit code 1 = "no match". Anything else is an unexpected error.
+    const exitCode = (err as { code?: number | string }).code;
+    if (typeof exitCode !== "number" || exitCode !== 1) {
+      // pgrep exit code 1 = "no match". Anything else (ENOENT, signal, etc.) is unexpected.
       logger.error("pgrep failed unexpectedly", err);
       throw err;
     }
