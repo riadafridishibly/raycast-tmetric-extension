@@ -5,19 +5,30 @@ import { logger } from "../lib/logger";
 export class TimerService {
   private api: ITMetricApi;
   private cachedAccountId: number | null = null;
+  private inflight = new Map<string, Promise<unknown>>();
 
   constructor(api: ITMetricApi) {
     this.api = api;
   }
 
-  async getAccountId(): Promise<number> {
-    if (this.cachedAccountId !== null) {
-      return this.cachedAccountId;
+  /** Return an in-flight promise for `key`, or start one via `fn`. */
+  private dedup<T>(key: string, fn: () => Promise<T>): Promise<T> {
+    let promise = this.inflight.get(key) as Promise<T> | undefined;
+    if (!promise) {
+      promise = fn().finally(() => this.inflight.delete(key));
+      this.inflight.set(key, promise);
     }
-    const user = await this.api.getUser();
-    this.cachedAccountId = user.activeAccountId;
-    logger.info(`Resolved account ID: ${this.cachedAccountId}`);
-    return this.cachedAccountId;
+    return promise;
+  }
+
+  async getAccountId(): Promise<number> {
+    if (this.cachedAccountId !== null) return this.cachedAccountId;
+    return this.dedup("getAccountId", async () => {
+      const user = await this.api.getUser();
+      this.cachedAccountId = user.activeAccountId;
+      logger.info(`Resolved account ID: ${this.cachedAccountId}`);
+      return this.cachedAccountId;
+    });
   }
 
   async startTimer(input: StartTimerInput): Promise<void> {
@@ -33,24 +44,28 @@ export class TimerService {
   }
 
   async getStatus(): Promise<TimerStatus> {
-    const accountId = await this.getAccountId();
-    const entry = await this.api.getLatestEntry(accountId);
+    return this.dedup("getStatus", async () => {
+      const accountId = await this.getAccountId();
+      const entry = await this.api.getLatestEntry(accountId);
 
-    if (!entry || entry.endTime != null) {
-      return { isRunning: false };
-    }
+      if (!entry || entry.endTime != null) {
+        return { isRunning: false };
+      }
 
-    return {
-      isRunning: true,
-      description: entry.note || undefined,
-      projectName: entry.project?.name,
-      startTime: entry.startTime,
-      elapsedSeconds: Math.floor((Date.now() - new Date(entry.startTime).getTime()) / 1000),
-    };
+      return {
+        isRunning: true,
+        description: entry.note || undefined,
+        projectName: entry.project?.name,
+        startTime: entry.startTime,
+        elapsedSeconds: Math.floor((Date.now() - new Date(entry.startTime).getTime()) / 1000),
+      };
+    });
   }
 
   async getProjects(): Promise<TMetricProject[]> {
-    const accountId = await this.getAccountId();
-    return this.api.getProjects(accountId);
+    return this.dedup("getProjects", async () => {
+      const accountId = await this.getAccountId();
+      return this.api.getProjects(accountId);
+    });
   }
 }

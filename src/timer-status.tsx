@@ -1,10 +1,10 @@
 import { Action, ActionPanel, Detail, List, showToast, Toast, Icon, Color } from "@raycast/api";
+import { useCachedPromise } from "@raycast/utils";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { TimerService } from "./services/timer-service";
 import { createApiClient } from "./api/api-factory";
 import { getPreferences } from "./lib/preferences";
 import { logger } from "./lib/logger";
-import type { TimerStatus as TimerStatusType } from "./types";
 
 function formatElapsed(seconds: number): string {
   const h = Math.floor(seconds / 3600);
@@ -18,10 +18,7 @@ function computeElapsed(startTime: string): number {
 }
 
 export default function TimerStatusCommand() {
-  const [status, setStatus] = useState<TimerStatusType | null>(null);
   const [elapsed, setElapsed] = useState(0);
-  const [isLoading, setIsLoading] = useState(true);
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const { apiToken, useMockApi } = getPreferences();
   const serviceRef = useRef<TimerService | null>(null);
@@ -29,62 +26,37 @@ export default function TimerStatusCommand() {
     serviceRef.current = new TimerService(createApiClient(apiToken, useMockApi));
   }
 
-  function stopTicking() {
-    if (intervalRef.current) {
-      clearInterval(intervalRef.current);
-      intervalRef.current = null;
-    }
-  }
-
-  function startTicking(startTime: string) {
-    stopTicking();
-    setElapsed(computeElapsed(startTime));
-    intervalRef.current = setInterval(() => {
-      setElapsed(computeElapsed(startTime));
-    }, 1000);
-  }
-
-  const cancelledRef = useRef(false);
-
-  async function loadStatus() {
-    try {
-      const result = await serviceRef.current!.getStatus();
-      if (cancelledRef.current) return;
-      setStatus(result);
-      if (result.isRunning && result.startTime) {
-        startTicking(result.startTime);
-      } else {
-        stopTicking();
-      }
-    } catch (error) {
-      logger.error("Failed to load timer status", error);
-      if (cancelledRef.current) return;
-      await showToast({ style: Toast.Style.Failure, title: "Failed to load status", message: String(error) });
-    } finally {
-      if (!cancelledRef.current) setIsLoading(false);
-    }
-  }
+  const { data: status, isLoading, revalidate, error } = useCachedPromise(
+    () => serviceRef.current!.getStatus(),
+    [],
+  );
 
   useEffect(() => {
-    cancelledRef.current = false;
-    loadStatus();
-    return () => {
-      cancelledRef.current = true;
-      stopTicking();
-    };
-  }, []);
+    if (error) {
+      logger.error("Failed to load timer status", error);
+      showToast({ style: Toast.Style.Failure, title: "Failed to load status", message: String(error) });
+    }
+  }, [error]);
+
+  useEffect(() => {
+    if (status?.isRunning && status.startTime) {
+      const startTime = status.startTime;
+      setElapsed(computeElapsed(startTime));
+      const id = setInterval(() => setElapsed(computeElapsed(startTime)), 1000);
+      return () => clearInterval(id);
+    }
+  }, [status?.isRunning, status?.startTime]);
 
   const handleStop = useCallback(async () => {
     try {
       await serviceRef.current!.stopTimer();
-      stopTicking();
       await showToast({ style: Toast.Style.Success, title: "Timer stopped" });
-      await loadStatus();
+      revalidate();
     } catch (error) {
       logger.error("Failed to stop timer", error);
       await showToast({ style: Toast.Style.Failure, title: "Failed to stop timer", message: String(error) });
     }
-  }, []);
+  }, [revalidate]);
 
   if (!isLoading && status && !status.isRunning) {
     return (
@@ -96,7 +68,6 @@ export default function TimerStatusCommand() {
 
   if (status?.isRunning) {
     const startedAt = status.startTime ? new Date(status.startTime).toLocaleTimeString() : "—";
-
     const markdown = `# ${formatElapsed(elapsed)}\n\n${status.description || "No description"}`;
 
     return (
@@ -131,7 +102,7 @@ export default function TimerStatusCommand() {
         actions={
           <ActionPanel>
             <Action title="Stop Timer" icon={{ source: Icon.Stop, tintColor: Color.Red }} onAction={handleStop} />
-            <Action title="Refresh" icon={Icon.ArrowClockwise} onAction={loadStatus} />
+            <Action title="Refresh" icon={Icon.ArrowClockwise} onAction={revalidate} />
           </ActionPanel>
         }
       />

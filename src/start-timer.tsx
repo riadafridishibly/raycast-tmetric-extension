@@ -1,38 +1,23 @@
 import { Action, ActionPanel, Form, showToast, Toast, popToRoot, Icon } from "@raycast/api";
-import { useState, useEffect, useRef } from "react";
+import { useCachedPromise } from "@raycast/utils";
+import { useRef } from "react";
 import { TimerService } from "./services/timer-service";
 import { createApiClient } from "./api/api-factory";
 import { getPreferences } from "./lib/preferences";
 import { ensureTMetricAppRunning } from "./services/app-launcher";
 import { logger } from "./lib/logger";
-import type { TMetricProject } from "./types";
 
 export default function StartTimer() {
-  const [projects, setProjects] = useState<TMetricProject[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-
   const { apiToken, useMockApi } = getPreferences();
   const serviceRef = useRef<TimerService | null>(null);
   if (!serviceRef.current) {
     serviceRef.current = new TimerService(createApiClient(apiToken, useMockApi));
   }
 
-  useEffect(() => {
-    let cancelled = false;
-    async function loadProjects() {
-      try {
-        const result = await serviceRef.current!.getProjects();
-        if (!cancelled) setProjects(result);
-      } catch (error) {
-        logger.error("Failed to load projects", error);
-        if (!cancelled) await showToast({ style: Toast.Style.Failure, title: "Failed to load projects", message: String(error) });
-      } finally {
-        if (!cancelled) setIsLoading(false);
-      }
-    }
-    loadProjects();
-    return () => { cancelled = true; };
-  }, []);
+  const { data: projects, isLoading } = useCachedPromise(
+    () => serviceRef.current!.getProjects(),
+    [],
+  );
 
   async function handleSubmit(values: { description: string; projectId: string }) {
     try {
@@ -67,7 +52,7 @@ export default function StartTimer() {
       <Form.Separator />
       <Form.Dropdown id="projectId" title="Project" storeValue>
         <Form.Dropdown.Item value="" title="No Project" icon={Icon.Circle} />
-        {projects.map((project) => (
+        {(projects ?? []).map((project) => (
           <Form.Dropdown.Item key={project.id} value={String(project.id)} title={project.name} icon={Icon.Folder} />
         ))}
       </Form.Dropdown>
