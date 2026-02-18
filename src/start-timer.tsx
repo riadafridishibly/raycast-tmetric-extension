@@ -1,4 +1,4 @@
-import { Action, ActionPanel, Form, showToast, Toast, popToRoot } from "@raycast/api";
+import { Action, ActionPanel, Form, showToast, Toast, popToRoot, Icon } from "@raycast/api";
 import { useState, useEffect, useRef } from "react";
 import { TimerService } from "./services/timer-service";
 import { createApiClient } from "./api/api-factory";
@@ -58,11 +58,17 @@ export default function StartTimer() {
         </ActionPanel>
       }
     >
-      <Form.TextField id="description" title="Description" placeholder="What are you working on?" />
-      <Form.Dropdown id="projectId" title="Project">
-        <Form.Dropdown.Item value="" title="No Project" />
+      <Form.TextField
+        id="description"
+        title="Description"
+        placeholder="What are you working on?"
+        autoFocus
+      />
+      <Form.Separator />
+      <Form.Dropdown id="projectId" title="Project" storeValue>
+        <Form.Dropdown.Item value="" title="No Project" icon={Icon.Circle} />
         {projects.map((project) => (
-          <Form.Dropdown.Item key={project.projectId} value={String(project.projectId)} title={project.projectName} />
+          <Form.Dropdown.Item key={project.projectId} value={String(project.projectId)} title={project.projectName} icon={Icon.Folder} />
         ))}
       </Form.Dropdown>
     </Form>

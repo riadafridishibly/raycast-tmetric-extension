@@ -1,4 +1,4 @@
-import { Action, ActionPanel, List, showToast, Toast, Icon } from "@raycast/api";
+import { Action, ActionPanel, Detail, List, showToast, Toast, Icon, Color } from "@raycast/api";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { TimerService } from "./services/timer-service";
 import { createApiClient } from "./api/api-factory";
@@ -94,22 +94,51 @@ export default function TimerStatusCommand() {
     );
   }
 
+  if (status?.isRunning) {
+    const startedAt = status.startTime ? new Date(status.startTime).toLocaleTimeString() : "—";
+
+    const markdown = `# ${formatElapsed(elapsed)}\n\n${status.description || "No description"}`;
+
+    return (
+      <Detail
+        isLoading={isLoading}
+        markdown={markdown}
+        metadata={
+          <Detail.Metadata>
+            <Detail.Metadata.Label
+              title="Status"
+              text={{ value: "Running", color: Color.Green }}
+              icon={{ source: Icon.CircleFilled, tintColor: Color.Green }}
+            />
+            <Detail.Metadata.Separator />
+            <Detail.Metadata.Label
+              title="Project"
+              text={status.projectName || "No Project"}
+              icon={Icon.Folder}
+            />
+            <Detail.Metadata.Label
+              title="Started At"
+              text={startedAt}
+              icon={Icon.Clock}
+            />
+            <Detail.Metadata.Label
+              title="Elapsed"
+              text={formatElapsed(elapsed)}
+              icon={Icon.Stopwatch}
+            />
+          </Detail.Metadata>
+        }
+        actions={
+          <ActionPanel>
+            <Action title="Stop Timer" icon={{ source: Icon.Stop, tintColor: Color.Red }} onAction={handleStop} />
+            <Action title="Refresh" icon={Icon.ArrowClockwise} onAction={loadStatus} />
+          </ActionPanel>
+        }
+      />
+    );
+  }
+
   return (
-    <List isLoading={isLoading}>
-      {status?.isRunning && (
-        <List.Item
-          icon={Icon.Clock}
-          title={status.description || "No description"}
-          subtitle={status.projectName}
-          accessories={[{ text: formatElapsed(elapsed) }]}
-          actions={
-            <ActionPanel>
-              <Action title="Stop Timer" icon={Icon.Stop} onAction={handleStop} />
-              <Action title="Refresh" icon={Icon.ArrowClockwise} onAction={loadStatus} />
-            </ActionPanel>
-          }
-        />
-      )}
-    </List>
+    <Detail isLoading={isLoading} markdown="" />
   );
 }
